@@ -1,0 +1,26 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MidiEditor", "src\MidiEditor\MidiEditor.csproj", "{1B35D62A-9BFA-4B7B-929E-8C75A9F9C501}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MidiEditor.Tests", "tests\MidiEditor.Tests\MidiEditor.Tests.csproj", "{E12B4A85-0F73-4695-B13A-97828F576D11}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1B35D62A-9BFA-4B7B-929E-8C75A9F9C501}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1B35D62A-9BFA-4B7B-929E-8C75A9F9C501}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1B35D62A-9BFA-4B7B-929E-8C75A9F9C501}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1B35D62A-9BFA-4B7B-929E-8C75A9F9C501}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E12B4A85-0F73-4695-B13A-97828F576D11}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E12B4A85-0F73-4695-B13A-97828F576D11}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E12B4A85-0F73-4695-B13A-97828F576D11}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E12B4A85-0F73-4695-B13A-97828F576D11}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
+

@@ -1,0 +1,59 @@
+name: Build and release on push
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-windows-x64:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore MidiEditor.sln
+
+      - name: Test
+        run: dotnet test MidiEditor.sln --configuration Release --no-restore
+
+      - name: Publish Windows x64
+        run: >-
+          dotnet publish src/MidiEditor/MidiEditor.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          --output artifacts/PulseGrid-windows-x64
+
+      - name: Package release
+        shell: pwsh
+        run: |
+          Compress-Archive -Path artifacts/PulseGrid-windows-x64/* -DestinationPath artifacts/PulseGrid-windows-x64.zip
+
+      - name: Create timestamp release
+        id: release
+        shell: pwsh
+        run: |
+          $timestamp = (Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss')
+          $tag = "release-$timestamp-${{ github.run_number }}"
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          gh release create $tag artifacts/PulseGrid-windows-x64.zip `
+            --target $env:GITHUB_SHA `
+            --title "PulseGrid $timestamp UTC" `
+            --notes "Automated Windows x64 build from commit $env:GITHUB_SHA."
+        env:
+          GH_TOKEN: ${{ github.token }}
