@@ -4,7 +4,7 @@
   <p>피아노 롤, 플레이리스트, 드럼 시퀀서가 한 화면에 담긴 Windows용 MIDI 편집기입니다.</p>
 </div>
 
-![PulseGrid에서 예제 곡을 편집하는 메인 화면](docs/images/pulsegrid-main.jpg)
+![PulseGrid에서 멀티트랙 곡의 드럼 패턴과 벨로시티를 편집하는 화면](docs/images/pulsegrid-main.jpg)
 
 ## 주요 기능
 

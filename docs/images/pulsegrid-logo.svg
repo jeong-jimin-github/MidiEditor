@@ -1,27 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="720" height="180" viewBox="0 0 720 180" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="180" viewBox="0 0 760 180" role="img" aria-labelledby="title desc">
   <title id="title">PulseGrid MIDI Studio</title>
-  <desc id="desc">민트색 음표와 그리드로 표현한 PulseGrid 로고</desc>
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#171d28"/>
-      <stop offset="1" stop-color="#0d1119"/>
-    </linearGradient>
-    <linearGradient id="mint" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#72f0c1"/>
-      <stop offset="1" stop-color="#39bfa2"/>
-    </linearGradient>
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="6" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-  </defs>
-  <rect width="720" height="180" rx="32" fill="url(#bg)"/>
-  <g opacity=".18" stroke="#72f0c1">
-    <path d="M28 45h142M28 75h142M28 105h142M28 135h142"/>
-    <path d="M56 24v132M88 24v132M120 24v132M152 24v132"/>
+  <desc id="desc">피아노 롤과 스텝 시퀀서를 형상화한 PulseGrid 로고</desc>
+
+  <rect width="760" height="180" rx="28" fill="#111722"/>
+
+  <!-- Piano-roll mark -->
+  <rect x="34" y="30" width="120" height="120" rx="27" fill="#63D5A7"/>
+  <g fill="#14251F">
+    <rect x="53" y="51" width="51" height="13" rx="6.5"/>
+    <rect x="81" y="78" width="53" height="13" rx="6.5"/>
+    <rect x="53" y="105" width="68" height="13" rx="6.5"/>
   </g>
-  <rect x="38" y="38" width="104" height="104" rx="26" fill="url(#mint)" filter="url(#glow)"/>
-  <path d="M106 59v51.5a17 17 0 1 1-9-15V70l-28 7v42.5a17 17 0 1 1-9-15V70l46-11Z" fill="#101722"/>
-  <text x="178" y="99" fill="#f1f5f9" font-family="Segoe UI, Inter, sans-serif" font-size="56" font-weight="750" letter-spacing="2">PULSEGRID</text>
-  <text x="181" y="132" fill="#72f0c1" font-family="Segoe UI, Inter, sans-serif" font-size="18" font-weight="600" letter-spacing="7">MIDI STUDIO</text>
+  <g fill="#FFFFFF">
+    <rect x="53" y="127" width="9" height="8" rx="3"/>
+    <rect x="70" y="122" width="9" height="13" rx="3"/>
+    <rect x="87" y="116" width="9" height="19" rx="3"/>
+    <rect x="104" y="124" width="9" height="11" rx="3"/>
+    <rect x="121" y="119" width="9" height="16" rx="3"/>
+  </g>
+
+  <!-- Wordmark -->
+  <text x="187" y="102" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="58" font-weight="750" letter-spacing="1">
+    <tspan fill="#F5F7FA">PULSE</tspan><tspan fill="#63D5A7">GRID</tspan>
+  </text>
+  <rect x="190" y="121" width="40" height="3" rx="1.5" fill="#63D5A7"/>
+  <text x="244" y="129" fill="#8D99AA" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="16" font-weight="600" letter-spacing="6">MIDI STUDIO</text>
 </svg>
