@@ -1,12 +1,14 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.IO;
 
 namespace MidiEditor.Models;
 
 public enum TrackKind
 {
     Instrument,
-    Drums
+    Drums,
+    Vocal
 }
 
 public sealed class MidiTrack : ObservableObject
@@ -20,6 +22,7 @@ public sealed class MidiTrack : ObservableObject
     private bool _isMuted;
     private bool _isSolo;
     private double _volume = 0.9;
+    private string? _voicebankPath;
 
     public MidiTrack()
     {
@@ -45,7 +48,12 @@ public sealed class MidiTrack : ObservableObject
         }
     }
 
-    public string KindLabel => Kind == TrackKind.Drums ? "DRUMS" : $"CH {Channel + 1:00}";
+    public string KindLabel => Kind switch
+    {
+        TrackKind.Drums => "DRUMS",
+        TrackKind.Vocal => "VOCAL",
+        _ => $"CH {Channel + 1:00}"
+    };
 
     public int Channel
     {
@@ -73,7 +81,23 @@ public sealed class MidiTrack : ObservableObject
         set => SetField(ref _bank, Math.Clamp(value, 0, 16383));
     }
 
-    public string ProgramLabel => Kind == TrackKind.Drums ? "GM Drum Kit" : GeneralMidiPrograms.GetName(Program);
+    public string ProgramLabel => Kind switch
+    {
+        TrackKind.Drums => "GM Drum Kit",
+        TrackKind.Vocal => string.IsNullOrWhiteSpace(VoicebankPath) ? "Default Voice" : Path.GetFileName(VoicebankPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)),
+        _ => GeneralMidiPrograms.GetName(Program)
+    };
+
+    public string? VoicebankPath
+    {
+        get => _voicebankPath;
+        set
+        {
+            var normalized = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+            if (SetField(ref _voicebankPath, normalized))
+                OnPropertyChanged(nameof(ProgramLabel));
+        }
+    }
 
     public string Color
     {
@@ -114,7 +138,8 @@ public sealed class MidiTrack : ObservableObject
             Color = Color,
             IsMuted = IsMuted,
             IsSolo = IsSolo,
-            Volume = Volume
+            Volume = Volume,
+            VoicebankPath = VoicebankPath
         };
 
         foreach (var note in Notes)

@@ -6,6 +6,7 @@ public sealed class MidiNote : ObservableObject
     private double _lengthBeats = 0.25;
     private int _pitch = 60;
     private int _velocity = 100;
+    private string _lyric = string.Empty;
     private bool _isSelected;
 
     public Guid Id { get; init; } = Guid.NewGuid();
@@ -34,6 +35,12 @@ public sealed class MidiNote : ObservableObject
         set => SetField(ref _velocity, Math.Clamp(value, 1, 127));
     }
 
+    public string Lyric
+    {
+        get => _lyric;
+        set => SetField(ref _lyric, value?.Trim() ?? string.Empty);
+    }
+
     public bool IsSelected
     {
         get => _isSelected;
@@ -49,6 +56,7 @@ public sealed class MidiNote : ObservableObject
         LengthBeats = LengthBeats,
         Pitch = Pitch,
         Velocity = Velocity,
+        Lyric = Lyric,
         IsSelected = IsSelected
     };
 }

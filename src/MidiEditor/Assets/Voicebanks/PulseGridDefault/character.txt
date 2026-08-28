@@ -1,0 +1,3 @@
+name=PulseGrid Default Voice
+author=PulseGrid
+web=https://github.com/jeong-jimin-github/MidiEditor

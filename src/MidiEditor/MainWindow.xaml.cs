@@ -19,6 +19,8 @@ public partial class MainWindow : Window
 
     private readonly AudioEngine _audio = new();
     private readonly HistoryService _history = new();
+    private readonly VocalPreviewPlayer _vocalPreview = new();
+    private VocalToolSettings _vocalSettings = AppSettingsService.LoadVocalSettings();
     private readonly DispatcherTimer _uiTimer;
     private MidiProject _project = null!;
     private MidiTrack? _selectedTrack;
@@ -129,6 +131,11 @@ public partial class MainWindow : Window
             TrackNameBox.Text = string.Empty;
             ProgramCombo.SelectedIndex = -1;
             ChannelCombo.SelectedIndex = -1;
+            ProgramCombo.IsEnabled = false;
+            ChannelCombo.IsEnabled = false;
+            VocalInspectorPanel.Visibility = Visibility.Collapsed;
+            LyricBox.Text = string.Empty;
+            LyricBox.IsEnabled = false;
             EditorTrackTitle.Text = "No track selected";
             EditorColorBar.Background = Brushes.Transparent;
             SelectionStatusText.Text = string.Empty;
@@ -138,13 +145,15 @@ public partial class MainWindow : Window
             TrackNameBox.Text = _selectedTrack.Name;
             ProgramCombo.SelectedIndex = _selectedTrack.Program;
             ChannelCombo.SelectedIndex = _selectedTrack.Channel;
-            ProgramCombo.IsEnabled = _selectedTrack.Kind != TrackKind.Drums;
-            ChannelCombo.IsEnabled = _selectedTrack.Kind != TrackKind.Drums;
+            ProgramCombo.IsEnabled = _selectedTrack.Kind == TrackKind.Instrument;
+            ChannelCombo.IsEnabled = _selectedTrack.Kind == TrackKind.Instrument;
+            VocalInspectorPanel.Visibility = _selectedTrack.Kind == TrackKind.Vocal ? Visibility.Visible : Visibility.Collapsed;
             EditorTrackTitle.Text = _selectedTrack.Name;
             EditorColorBar.Background = new SolidColorBrush(DrawingColor(_selectedTrack.Color));
             SelectionStatusText.Text = $"{_selectedTrack.Notes.Count} notes  ·  {_selectedTrack.ProgramLabel}";
         }
         _updatingUi = false;
+        RefreshVocalInspector();
 
         if (autoChooseEditor)
             SelectEditor(_selectedTrack?.Kind == TrackKind.Drums);
@@ -159,11 +168,14 @@ public partial class MainWindow : Window
         Arrangement.TimelineInset = drums ? DrumPattern.TimelineInset : PianoRoll.TimelineInset;
         PianoRoll.Visibility = drums ? Visibility.Collapsed : Visibility.Visible;
         DrumPattern.Visibility = drums ? Visibility.Visible : Visibility.Collapsed;
+        PianoTabButton.Content = _selectedTrack?.Kind == TrackKind.Vocal ? "VOCAL ROLL" : "PIANO ROLL";
         PianoTabButton.Background = drums ? new SolidColorBrush(Color.FromRgb(36, 42, 52)) : FindBrush("AccentDarkBrush");
         DrumTabButton.Background = drums ? FindBrush("AccentDarkBrush") : new SolidColorBrush(Color.FromRgb(36, 42, 52));
         EditorHintText.Text = drums
             ? "  ·  click paint  ·  right-drag erase  ·  wheel instruments"
-            : "  ·  left draw/move  ·  edge resize  ·  right-drag erase";
+            : _selectedTrack?.Kind == TrackKind.Vocal
+                ? "  ·  draw notes  ·  select note then edit LYRIC  ·  quick render preview"
+                : "  ·  left draw/move  ·  edge resize  ·  right-drag erase";
         SyncTimelineHorizontalOffset(drums ? DrumPattern.HorizontalOffset : PianoRoll.HorizontalOffset);
         RefreshScrollBars();
     }
@@ -232,7 +244,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!_audio.IsLoaded && !await ChooseAndLoadSoundFontAsync())
+        if (!_audio.IsLoaded && !await LoadDefaultOrChooseSoundFontAsync())
         {
             ShowStatus("재생하려면 SoundFont(.sf2)를 먼저 선택해 주세요", warning: true);
             return;
@@ -272,6 +284,14 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) != true)
             return false;
         return await LoadSoundFontAsync(dialog.FileName);
+    }
+
+    private async Task<bool> LoadDefaultOrChooseSoundFontAsync()
+    {
+        var bundled = BundledAssetsService.DefaultSoundFontPath;
+        if (File.Exists(bundled) && await LoadSoundFontAsync(bundled, markProjectDirty: false))
+            return true;
+        return await ChooseAndLoadSoundFontAsync();
     }
 
     private async Task<bool> LoadSoundFontAsync(string path, bool markProjectDirty = true)
@@ -331,19 +351,18 @@ public partial class MainWindow : Window
         _startupSoundFontLoaded = true;
 
         var rememberedPath = AppSettingsService.LoadLastSoundFontPath();
-        if (string.IsNullOrWhiteSpace(rememberedPath))
-            return;
-        if (!File.Exists(rememberedPath))
-        {
+        var startupPath = !string.IsNullOrWhiteSpace(rememberedPath) && File.Exists(rememberedPath)
+            ? rememberedPath
+            : BundledAssetsService.DefaultSoundFontPath;
+        if (!string.IsNullOrWhiteSpace(rememberedPath) && !File.Exists(rememberedPath))
             AppSettingsService.SaveLastSoundFontPath(null);
-            ShowStatus($"기억된 SoundFont를 찾을 수 없습니다 · {Path.GetFileName(rememberedPath)}", warning: true);
-            return;
-        }
 
-        if (await LoadSoundFontAsync(rememberedPath, markProjectDirty: false))
+        if (File.Exists(startupPath) && await LoadSoundFontAsync(startupPath, markProjectDirty: false))
         {
             _cleanProjectSnapshot = _project.Clone();
             SetDirty(false);
+            if (string.Equals(startupPath, BundledAssetsService.DefaultSoundFontPath, StringComparison.OrdinalIgnoreCase))
+                ShowStatus("기본 CC0 SoundFont 준비 완료 · ChaosBank");
         }
     }
 
@@ -377,6 +396,8 @@ public partial class MainWindow : Window
             _audio.PreviewNoteOff(channel, e.Pitch);
     }
 
+    private void Editor_SelectionChanged(object? sender, EventArgs e) => RefreshVocalInspector();
+
     private void Editor_SeekRequested(object? sender, SeekRequestedEventArgs e)
     {
         _currentBeat = Math.Clamp(e.Beat, 0, _project.DurationBeats);
@@ -402,18 +423,19 @@ public partial class MainWindow : Window
 
     private void AddInstrumentButton_Click(object sender, RoutedEventArgs e) => AddTrack(TrackKind.Instrument);
     private void AddDrumButton_Click(object sender, RoutedEventArgs e) => AddTrack(TrackKind.Drums);
+    private void AddVocalButton_Click(object sender, RoutedEventArgs e) => AddTrack(TrackKind.Vocal);
 
     private void AddTrack(TrackKind kind)
     {
-        var usedChannels = _project.Tracks.Where(track => track.Kind == TrackKind.Instrument)
+        var usedChannels = _project.Tracks.Where(track => track.Kind != TrackKind.Drums)
             .Select(track => track.Channel).ToHashSet();
         var availableChannel = Enumerable.Range(0, 16)
             .Where(value => value != 9 && !usedChannels.Contains(value))
             .Select(value => (int?)value)
             .FirstOrDefault();
-        if (kind == TrackKind.Instrument && availableChannel is null)
+        if (kind != TrackKind.Drums && availableChannel is null)
         {
-            ShowStatus("사용 가능한 MIDI 악기 채널이 없습니다 (최대 15개)", warning: true);
+            ShowStatus("사용 가능한 MIDI 채널이 없습니다 (Ch 10 제외 최대 15개)", warning: true);
             return;
         }
 
@@ -422,10 +444,16 @@ public partial class MainWindow : Window
         var number = _project.Tracks.Count(track => track.Kind == kind) + 1;
         var track = new MidiTrack
         {
-            Name = kind == TrackKind.Drums ? $"Drums {number}" : $"Instrument {number}",
+            Name = kind switch
+            {
+                TrackKind.Drums => $"Drums {number}",
+                TrackKind.Vocal => $"Vocal {number}",
+                _ => $"Instrument {number}"
+            },
             Kind = kind,
             Channel = kind == TrackKind.Drums ? 9 : channel,
-            Program = kind == TrackKind.Drums ? 0 : 4,
+            Program = kind switch { TrackKind.Drums => 0, TrackKind.Vocal => 53, _ => 4 },
+            VoicebankPath = kind == TrackKind.Vocal ? VocalIntegrationService.DiscoverVoicebanks(_vocalSettings.VoicebankRootPath).FirstOrDefault()?.Path : null,
             Color = TrackColors[_project.Tracks.Count % TrackColors.Length]
         };
         _project.Tracks.Add(track);
@@ -469,7 +497,7 @@ public partial class MainWindow : Window
 
     private void ProgramCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_updatingUi || _selectedTrack is null || ProgramCombo.SelectedIndex < 0 || _selectedTrack.Kind == TrackKind.Drums)
+        if (_updatingUi || _selectedTrack is null || ProgramCombo.SelectedIndex < 0 || _selectedTrack.Kind != TrackKind.Instrument)
             return;
         _history.Begin(_project);
         _selectedTrack.Program = ProgramCombo.SelectedIndex;
@@ -483,7 +511,7 @@ public partial class MainWindow : Window
 
     private void ChannelCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (_updatingUi || _selectedTrack is null || ChannelCombo.SelectedIndex < 0 || _selectedTrack.Kind == TrackKind.Drums)
+        if (_updatingUi || _selectedTrack is null || ChannelCombo.SelectedIndex < 0 || _selectedTrack.Kind != TrackKind.Instrument)
             return;
         var requestedChannel = ChannelCombo.SelectedIndex;
         if (requestedChannel == 9)
@@ -507,6 +535,159 @@ public partial class MainWindow : Window
         _history.Commit(_project);
         SetDirty();
         TrackListBox.Items.Refresh();
+    }
+
+    private void RefreshVocalInspector()
+    {
+        if (VocalInspectorPanel is null || VoicebankCombo is null || LyricBox is null)
+            return;
+
+        var isVocal = _selectedTrack?.Kind == TrackKind.Vocal;
+        VocalInspectorPanel.Visibility = isVocal ? Visibility.Visible : Visibility.Collapsed;
+        if (!isVocal || _selectedTrack is null)
+        {
+            LyricBox.IsEnabled = false;
+            return;
+        }
+
+        var previousUpdating = _updatingUi;
+        _updatingUi = true;
+        try
+        {
+            var voicebanks = VocalIntegrationService.DiscoverVoicebanks(_vocalSettings.VoicebankRootPath).ToList();
+            if (!string.IsNullOrWhiteSpace(_selectedTrack.VoicebankPath) && Directory.Exists(_selectedTrack.VoicebankPath) &&
+                voicebanks.All(item => !string.Equals(item.Path, _selectedTrack.VoicebankPath, StringComparison.OrdinalIgnoreCase)))
+            {
+                voicebanks.Add(new VoicebankInfo(Path.GetFileName(_selectedTrack.VoicebankPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)), _selectedTrack.VoicebankPath));
+            }
+            VoicebankCombo.ItemsSource = voicebanks;
+            VoicebankCombo.SelectedItem = voicebanks.FirstOrDefault(item =>
+                string.Equals(item.Path, _selectedTrack.VoicebankPath, StringComparison.OrdinalIgnoreCase)) ?? voicebanks.FirstOrDefault();
+
+            var selectedNotes = _selectedTrack.Notes.Where(note => note.IsSelected).ToArray();
+            LyricBox.IsEnabled = selectedNotes.Length > 0;
+            if (selectedNotes.Length == 0)
+                LyricBox.Text = string.Empty;
+            else
+            {
+                var first = selectedNotes[0].Lyric;
+                LyricBox.Text = selectedNotes.All(note => note.Lyric == first) ? first : string.Empty;
+            }
+        }
+        finally
+        {
+            _updatingUi = previousUpdating;
+        }
+    }
+
+    private void VoicebankCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingUi || _selectedTrack?.Kind != TrackKind.Vocal || VoicebankCombo.SelectedItem is not VoicebankInfo voicebank ||
+            string.Equals(_selectedTrack.VoicebankPath, voicebank.Path, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        _history.Begin(_project);
+        _selectedTrack.VoicebankPath = voicebank.Path;
+        if (_history.Commit(_project))
+            SetDirty();
+        TrackListBox.Items.Refresh();
+        SelectionStatusText.Text = $"{_selectedTrack.Notes.Count} notes  ·  {_selectedTrack.ProgramLabel}";
+        ShowStatus($"보이스뱅크 변경 · {voicebank.Name}");
+    }
+
+    private void LyricBox_Commit(object sender, KeyboardFocusChangedEventArgs e) => CommitLyric();
+
+    private void LyricBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+            return;
+        CommitLyric();
+        PianoRoll.Focus();
+        e.Handled = true;
+    }
+
+    private void CommitLyric()
+    {
+        if (_updatingUi || _selectedTrack?.Kind != TrackKind.Vocal)
+            return;
+        var selected = _selectedTrack.Notes.Where(note => note.IsSelected).ToArray();
+        if (selected.Length == 0)
+            return;
+        var lyric = LyricBox.Text.Trim();
+        if (selected.All(note => note.Lyric == lyric))
+            return;
+
+        _history.Begin(_project);
+        foreach (var note in selected)
+            note.Lyric = lyric;
+        if (_history.Commit(_project))
+            SetDirty();
+        PianoRoll.InvalidateVisual();
+        ShowStatus(selected.Length == 1 ? $"가사 변경 · {lyric}" : $"선택 노트 {selected.Length}개의 가사를 변경했습니다");
+    }
+
+    private void VocalSettingsButton_Click(object sender, RoutedEventArgs e) => EditVocalSettings();
+
+    private bool EditVocalSettings()
+    {
+        var dialog = new VocalSettingsWindow(_vocalSettings) { Owner = this };
+        if (dialog.ShowDialog() != true)
+            return false;
+        _vocalSettings = dialog.Settings;
+        AppSettingsService.SaveVocalSettings(_vocalSettings);
+        RefreshVocalInspector();
+        ShowStatus("보컬/OpenUtau 설정을 저장했습니다");
+        return true;
+    }
+
+    private async void VocalPreviewButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedTrack?.Kind != TrackKind.Vocal)
+            return;
+        CommitLyric();
+        var trackId = _selectedTrack.Id;
+        var project = _project.Clone();
+        var track = project.Tracks.First(item => item.Id == trackId);
+        VocalPreviewButton.IsEnabled = false;
+        try
+        {
+            _audio.Stop();
+            _vocalPreview.Stop();
+            ShowStatus("보컬 빠른 미리듣기 렌더 중…");
+            var path = await VocalIntegrationService.RenderQuickPreviewAsync(project, track, _vocalSettings.Clone());
+            _vocalPreview.Play(path);
+            ShowStatus($"보컬 미리듣기 재생 · {track.ProgramLabel}");
+        }
+        catch (Exception exception)
+        {
+            ShowError("보컬 미리듣기를 만들지 못했습니다.", exception);
+        }
+        finally
+        {
+            VocalPreviewButton.IsEnabled = true;
+        }
+    }
+
+    private void OpenUtauButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedTrack?.Kind != TrackKind.Vocal)
+            return;
+        CommitLyric();
+        if (string.IsNullOrWhiteSpace(_vocalSettings.OpenUtauPath) || !File.Exists(_vocalSettings.OpenUtauPath))
+        {
+            if (!EditVocalSettings() || string.IsNullOrWhiteSpace(_vocalSettings.OpenUtauPath) || !File.Exists(_vocalSettings.OpenUtauPath))
+                return;
+        }
+
+        try
+        {
+            var path = VocalIntegrationService.OpenInOpenUtau(_project, _selectedTrack, _vocalSettings);
+            ShowStatus($"OpenUtau로 열었습니다 · {Path.GetFileName(path)}");
+        }
+        catch (Exception exception)
+        {
+            ShowError("OpenUtau를 실행하지 못했습니다.", exception);
+        }
     }
 
     private void TrackToggle_Click(object sender, RoutedEventArgs e)
@@ -736,6 +917,8 @@ public partial class MainWindow : Window
         var project = new MidiProject { Name = "New Project", LoopEndBeat = 16 };
         project.Tracks.Add(new MidiTrack { Name = "Instrument 1", Program = 4, Channel = 0, Color = TrackColors[0] });
         project.Tracks.Add(new MidiTrack { Name = "Drums 1", Kind = TrackKind.Drums, Channel = 9, Color = TrackColors[1] });
+        project.Tracks.Add(new MidiTrack { Name = "Vocal 1", Kind = TrackKind.Vocal, Program = 53, Channel = 1,
+            VoicebankPath = VocalIntegrationService.DiscoverVoicebanks(_vocalSettings.VoicebankRootPath).FirstOrDefault()?.Path, Color = TrackColors[2] });
         ApplyProject(project, null, true);
     }
 
@@ -984,6 +1167,7 @@ public partial class MainWindow : Window
             return;
         }
         _uiTimer.Stop();
+        _vocalPreview.Dispose();
         _audio.Dispose();
     }
 

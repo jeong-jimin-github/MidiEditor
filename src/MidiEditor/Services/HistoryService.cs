@@ -98,7 +98,7 @@ public sealed class HistoryService
             var b = right.Tracks[trackIndex];
             if (a.Id != b.Id || a.Name != b.Name || a.Kind != b.Kind || a.Channel != b.Channel ||
                 a.Program != b.Program || a.Bank != b.Bank || a.Color != b.Color || a.IsMuted != b.IsMuted ||
-                a.IsSolo != b.IsSolo || a.Volume != b.Volume || a.Notes.Count != b.Notes.Count)
+                a.IsSolo != b.IsSolo || a.Volume != b.Volume || a.VoicebankPath != b.VoicebankPath || a.Notes.Count != b.Notes.Count)
                 return false;
 
             for (var noteIndex = 0; noteIndex < a.Notes.Count; noteIndex++)
@@ -106,7 +106,7 @@ public sealed class HistoryService
                 var x = a.Notes[noteIndex];
                 var y = b.Notes[noteIndex];
                 if (x.Id != y.Id || x.StartBeat != y.StartBeat || x.LengthBeats != y.LengthBeats ||
-                    x.Pitch != y.Pitch || x.Velocity != y.Velocity)
+                    x.Pitch != y.Pitch || x.Velocity != y.Velocity || x.Lyric != y.Lyric)
                     return false;
             }
         }

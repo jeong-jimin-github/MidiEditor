@@ -119,6 +119,7 @@ public sealed class PianoRollControl : FrameworkElement
     public event EventHandler? EditFinished;
     public event EventHandler<NotePreviewEventArgs>? PreviewNote;
     public event EventHandler<SeekRequestedEventArgs>? SeekRequested;
+    public event EventHandler? SelectionChanged;
     public event EventHandler? ViewportChanged;
 
     private double GridBottom => Math.Max(HeaderHeight + 40, ActualHeight - VelocityHeight);
@@ -266,7 +267,10 @@ public sealed class PianoRollControl : FrameworkElement
 
             if (rect.Width > 42 && RowHeight > 12)
             {
-                var text = DrawingTools.Text($"{DrawingTools.NoteName(note.Pitch)}  {note.Velocity}", 9,
+                var noteLabel = _track.Kind == TrackKind.Vocal && !string.IsNullOrWhiteSpace(note.Lyric)
+                    ? $"{note.Lyric}  ·  {DrawingTools.NoteName(note.Pitch)}"
+                    : $"{DrawingTools.NoteName(note.Pitch)}  {note.Velocity}";
+                var text = DrawingTools.Text(noteLabel, 9,
                     new SolidColorBrush(Color.FromArgb(220, 12, 22, 20)), true);
                 dc.PushClip(new RectangleGeometry(rect));
                 dc.DrawText(text, new Point(rect.Left + 5, rect.Top + Math.Max(1, (rect.Height - text.Height) / 2)));
@@ -369,9 +373,10 @@ public sealed class PianoRollControl : FrameworkElement
         {
             SelectOnly(null);
             var start = Snap(XToBeat(point.X));
-            var note = new MidiNote { StartBeat = start, LengthBeats = SnapBeats, Pitch = pitch, Velocity = 100, IsSelected = true };
+            var note = new MidiNote { StartBeat = start, LengthBeats = SnapBeats, Pitch = pitch, Velocity = 100, Lyric = _track.Kind == TrackKind.Vocal ? "a" : string.Empty, IsSelected = true };
             EditStarted?.Invoke(this, EventArgs.Empty);
             _track.Notes.Add(note);
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
             _activeNote = note;
             _mode = EditMode.Draw;
             _dragOrigin = point;
@@ -520,6 +525,7 @@ public sealed class PianoRollControl : FrameworkElement
             EditStarted?.Invoke(this, EventArgs.Empty);
             foreach (var note in selected)
                 _track.Notes.Remove(note);
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
             EditFinished?.Invoke(this, EventArgs.Empty);
             InvalidateVisual();
             e.Handled = true;
@@ -528,6 +534,7 @@ public sealed class PianoRollControl : FrameworkElement
         {
             foreach (var note in _track.Notes)
                 note.IsSelected = true;
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
             InvalidateVisual();
             e.Handled = true;
         }
@@ -546,10 +553,12 @@ public sealed class PianoRollControl : FrameworkElement
                     StartBeat = note.StartBeat + SnapBeats,
                     LengthBeats = note.LengthBeats,
                     Pitch = note.Pitch,
-                    Velocity = note.Velocity
+                    Velocity = note.Velocity,
+                    Lyric = note.Lyric
                 };
                 _track.Notes.Add(clone);
             }
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
             EditFinished?.Invoke(this, EventArgs.Empty);
             InvalidateVisual();
             e.Handled = true;
@@ -641,7 +650,10 @@ public sealed class PianoRollControl : FrameworkElement
             }
         }
         if (changed)
+        {
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
             InvalidateVisual();
+        }
     }
 
     private Rect NoteRect(MidiNote note)
@@ -655,8 +667,15 @@ public sealed class PianoRollControl : FrameworkElement
     {
         if (_track is null)
             return;
+        var changed = false;
         foreach (var note in _track.Notes)
-            note.IsSelected = note == selected;
+        {
+            var isSelected = note == selected;
+            changed |= note.IsSelected != isSelected;
+            note.IsSelected = isSelected;
+        }
+        if (changed)
+            SelectionChanged?.Invoke(this, EventArgs.Empty);
         InvalidateVisual();
     }
 

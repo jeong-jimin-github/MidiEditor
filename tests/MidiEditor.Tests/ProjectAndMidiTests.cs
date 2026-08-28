@@ -290,4 +290,120 @@ public sealed class ProjectAndMidiTests
         Assert.Equal(88200, plan.BeatToSample(3));
         Assert.Equal(3, plan.SampleToBeat(88200), 6);
     }
+
+    [Fact]
+    public void AppSettings_SavingVocalToolsPreservesRememberedSoundFont()
+    {
+        var settingsPath = Path.Combine(Path.GetTempPath(), $"pulsegrid-settings-{Guid.NewGuid():N}.json");
+        try
+        {
+            AppSettingsService.SaveLastSoundFontPath(@"C:\Sounds\Default.sf2", settingsPath);
+            AppSettingsService.SaveVocalSettings(new VocalToolSettings
+            {
+                VoicebankRootPath = @"C:\Voicebanks",
+                OpenUtauPath = @"C:\OpenUtau\OpenUtau.exe",
+                ResamplerPath = @"C:\Tools\resampler.exe",
+                WavtoolPath = @"C:\Tools\wavtool.exe"
+            }, settingsPath);
+
+            Assert.Equal(@"C:\Sounds\Default.sf2", AppSettingsService.LoadLastSoundFontPath(settingsPath));
+            var vocal = AppSettingsService.LoadVocalSettings(settingsPath);
+            Assert.Equal(@"C:\Voicebanks", vocal.VoicebankRootPath);
+            Assert.Equal(@"C:\OpenUtau\OpenUtau.exe", vocal.OpenUtauPath);
+            Assert.Equal(@"C:\Tools\resampler.exe", vocal.ResamplerPath);
+            Assert.Equal(@"C:\Tools\wavtool.exe", vocal.WavtoolPath);
+        }
+        finally
+        {
+            File.Delete(settingsPath);
+        }
+    }
+
+    [Fact]
+    public void ProjectFile_RoundTripsVocalVoicebankAndLyrics()
+    {
+        var project = new MidiProject { Name = "Vocal Test" };
+        var vocal = new MidiTrack
+        {
+            Name = "Lead Vocal",
+            Kind = TrackKind.Vocal,
+            Channel = 2,
+            Program = 53,
+            VoicebankPath = @"C:\Voicebanks\Momo"
+        };
+        vocal.Notes.Add(new MidiNote { StartBeat = 0.5, LengthBeats = 1.25, Pitch = 64, Velocity = 108, Lyric = "ka" });
+        project.Tracks.Add(vocal);
+        var path = Path.Combine(Path.GetTempPath(), $"pulsegrid-vocal-{Guid.NewGuid():N}.pulsegrid");
+        try
+        {
+            ProjectFileService.Save(path, project);
+            var loaded = ProjectFileService.Load(path);
+            var loadedTrack = Assert.Single(loaded.Tracks);
+            var loadedNote = Assert.Single(loadedTrack.Notes);
+            Assert.Equal(TrackKind.Vocal, loadedTrack.Kind);
+            Assert.Equal(vocal.VoicebankPath, loadedTrack.VoicebankPath);
+            Assert.Equal("ka", loadedNote.Lyric);
+            Assert.Equal(0.5, loadedNote.StartBeat);
+            Assert.Equal(1.25, loadedNote.LengthBeats);
+            Assert.Equal(64, loadedNote.Pitch);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void VocalIntegration_ExportsOpenUtauCompatibleUstWithConfiguredTools()
+    {
+        var project = new MidiProject { Name = "Song", Tempo = 135 };
+        var vocal = new MidiTrack
+        {
+            Name = "Vocal",
+            Kind = TrackKind.Vocal,
+            VoicebankPath = BundledAssetsService.DefaultVoicebankPath
+        };
+        vocal.Notes.Add(new MidiNote { StartBeat = 0.5, LengthBeats = 1, Pitch = 67, Velocity = 111, Lyric = "a" });
+        project.Tracks.Add(vocal);
+        var path = Path.Combine(Path.GetTempPath(), $"pulsegrid-{Guid.NewGuid():N}.ust");
+        var settings = new VocalToolSettings { ResamplerPath = @"C:\Tools\resampler.exe", WavtoolPath = @"C:\Tools\wavtool.exe" };
+        try
+        {
+            VocalIntegrationService.ExportUst(path, project, vocal, settings);
+            var text = File.ReadAllText(path);
+            Assert.Contains("UST Version1.2", text);
+            Assert.Contains("Tempo=135", text);
+            Assert.Contains($"VoiceDir={BundledAssetsService.DefaultVoicebankPath}", text);
+            Assert.Contains(@"Tool1=C:\Tools\resampler.exe", text);
+            Assert.Contains(@"Tool2=C:\Tools\wavtool.exe", text);
+            Assert.Contains("Lyric=R", text);
+            Assert.Contains("Lyric=a", text);
+            Assert.Contains("NoteNum=67", text);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task BundledAssets_LoadSoundFontAndRenderDefaultVocalPreview()
+    {
+        Assert.True(File.Exists(BundledAssetsService.DefaultSoundFontPath));
+        Assert.True(Directory.Exists(BundledAssetsService.DefaultVoicebankPath));
+
+        using (var audio = new AudioEngine())
+        {
+            await audio.LoadSoundFontAsync(BundledAssetsService.DefaultSoundFontPath);
+            Assert.True(audio.IsLoaded);
+        }
+
+        var project = new MidiProject { Tempo = 120 };
+        var vocal = new MidiTrack { Kind = TrackKind.Vocal, VoicebankPath = BundledAssetsService.DefaultVoicebankPath };
+        vocal.Notes.Add(new MidiNote { StartBeat = 0, LengthBeats = 0.25, Pitch = 60, Velocity = 100, Lyric = "a" });
+        project.Tracks.Add(vocal);
+        var preview = await VocalIntegrationService.RenderQuickPreviewAsync(project, vocal, new VocalToolSettings());
+        Assert.True(File.Exists(preview));
+        Assert.True(new FileInfo(preview).Length > 44);
+    }
 }

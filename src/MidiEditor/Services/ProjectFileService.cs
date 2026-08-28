@@ -41,12 +41,14 @@ public static class ProjectFileService
                 IsMuted = track.IsMuted,
                 IsSolo = track.IsSolo,
                 Volume = track.Volume,
+                VoicebankPath = track.VoicebankPath,
                 Notes = track.Notes.Select(note => new NoteDto
                 {
                     StartBeat = note.StartBeat,
                     LengthBeats = note.LengthBeats,
                     Pitch = note.Pitch,
-                    Velocity = note.Velocity
+                    Velocity = note.Velocity,
+                    Lyric = note.Lyric
                 }).ToList()
             }).ToList()
         };
@@ -87,10 +89,11 @@ public static class ProjectFileService
                 Color = source.Color,
                 IsMuted = source.IsMuted,
                 IsSolo = source.IsSolo,
-                Volume = source.Volume
+                Volume = source.Volume,
+                VoicebankPath = source.VoicebankPath
             };
             foreach (var item in source.Notes)
-                track.Notes.Add(new MidiNote { StartBeat = item.StartBeat, LengthBeats = item.LengthBeats, Pitch = item.Pitch, Velocity = item.Velocity });
+                track.Notes.Add(new MidiNote { StartBeat = item.StartBeat, LengthBeats = item.LengthBeats, Pitch = item.Pitch, Velocity = item.Velocity, Lyric = item.Lyric });
             project.Tracks.Add(track);
         }
 
@@ -129,6 +132,7 @@ public static class ProjectFileService
         public bool IsMuted { get; set; }
         public bool IsSolo { get; set; }
         public double Volume { get; set; } = 0.9;
+        public string? VoicebankPath { get; set; }
         public List<NoteDto> Notes { get; set; } = [];
     }
 
@@ -138,5 +142,6 @@ public static class ProjectFileService
         public double LengthBeats { get; set; }
         public int Pitch { get; set; }
         public int Velocity { get; set; }
+        public string Lyric { get; set; } = string.Empty;
     }
 }
