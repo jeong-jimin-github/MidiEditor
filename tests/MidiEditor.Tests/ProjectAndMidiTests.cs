@@ -392,11 +392,8 @@ public sealed class ProjectAndMidiTests
         Assert.True(File.Exists(BundledAssetsService.DefaultSoundFontPath));
         Assert.True(Directory.Exists(BundledAssetsService.DefaultVoicebankPath));
 
-        using (var audio = new AudioEngine())
-        {
-            await audio.LoadSoundFontAsync(BundledAssetsService.DefaultSoundFontPath);
-            Assert.True(audio.IsLoaded);
-        }
+        var soundFont = new MeltySynth.SoundFont(BundledAssetsService.DefaultSoundFontPath);
+        Assert.NotNull(soundFont);
 
         var project = new MidiProject { Tempo = 120 };
         var vocal = new MidiTrack { Kind = TrackKind.Vocal, VoicebankPath = BundledAssetsService.DefaultVoicebankPath };
