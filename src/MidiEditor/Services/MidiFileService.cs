@@ -22,7 +22,7 @@ public static class MidiFileService
             MissedEndOfTrackPolicy = MissedEndOfTrackPolicy.Ignore
         });
         if (file.TimeDivision is not TicksPerQuarterNoteTimeDivision timeDivision)
-            throw new NotSupportedException("SMPTE time-division MIDI는 아직 지원하지 않습니다. PPQ 형식으로 변환해 주세요.");
+            throw new NotSupportedException(LocalizationService.Get("Error.SmpteUnsupported"));
 
         var ppq = timeDivision.TicksPerQuarterNote;
         // Standard MIDI files without an initial tempo event play at 120 BPM.

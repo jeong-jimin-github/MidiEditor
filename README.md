@@ -15,14 +15,16 @@
 - **기본 SoundFont 포함** — CC0로 배포되는 `ChaosBank.sf2`가 함께 제공되어 첫 실행부터 악기/드럼을 재생할 수 있으며 원하는 `.sf2`로 교체할 수 있습니다.
 - **MIDI 및 프로젝트 파일** — 멀티트랙 `.mid` 파일을 가져오거나 내보내고, 작업을 `.pulsegrid` 프로젝트로 저장할 수 있습니다.
 - **편집 도구** — 실행 취소/다시 실행, Snap, 확대·축소, 루프 재생과 퀀타이즈를 지원합니다.
+- **다국어 UI** — 한국어, English, 日本語, 简体中文을 지원합니다. 첫 실행에서는 Windows 표시 언어를 자동 감지하고, 이후에는 하단 언어 선택기에서 즉시 변경한 값을 기억합니다.
 
 ## 시작하기
 
 1. [Releases](../../releases)에서 최신 `PulseGrid-windows-x64.zip`을 받습니다.
 2. ZIP 파일의 압축을 푼 뒤 `PulseGrid.exe`를 실행합니다.
-3. 번들된 기본 SoundFont가 자동으로 로드되므로 바로 재생할 수 있습니다. 다른 SF2를 쓰려면 왼쪽 아래 **SoundFont** 버튼에서 선택합니다.
-4. 보컬 작업은 트랙 목록 위 **V** 버튼으로 Vocal 트랙을 추가합니다.
-5. **⚙ 보컬/OpenUtau 설정**에서 보이스뱅크 PATH, `OpenUtau.exe`, 필요 시 `resampler`/`wavtool`을 지정합니다.
+3. Windows 표시 언어에 맞춰 UI가 자동으로 선택됩니다. 하단의 언어 선택기에서 **한국어 / English / 日本語 / 简体中文** 중 원하는 언어로 언제든 변경할 수 있습니다.
+4. 번들된 기본 SoundFont가 자동으로 로드되므로 바로 재생할 수 있습니다. 다른 SF2를 쓰려면 왼쪽 아래 **SoundFont** 버튼에서 선택합니다.
+5. 보컬 작업은 트랙 목록 위 **V** 버튼으로 Vocal 트랙을 추가합니다.
+6. **⚙ 보컬/OpenUtau 설정**에서 보이스뱅크 PATH, `OpenUtau.exe`, 필요 시 `resampler`/`wavtool`을 지정합니다.
 
 > PulseGrid는 Windows 10/11 및 .NET 8 기반입니다. OpenUtau 자체는 번들하지 않으며, 설치된 OpenUtau를 사용하려면 실행 파일 경로를 한 번 지정하면 됩니다.
 

@@ -31,6 +31,16 @@ public static class AppSettingsService
     public static string? LoadLastSoundFontPath(string? settingsPath = null) =>
         Load(settingsPath).LastSoundFontPath;
 
+    public static string? LoadLanguageCode(string? settingsPath = null) =>
+        Load(settingsPath).LanguageCode;
+
+    public static void SaveLanguageCode(string? languageCode, string? settingsPath = null)
+    {
+        var settings = Load(settingsPath);
+        settings.LanguageCode = string.IsNullOrWhiteSpace(languageCode) ? null : LocalizationService.NormalizeLanguageCode(languageCode);
+        Save(settings, settingsPath);
+    }
+
     public static void SaveLastSoundFontPath(string? soundFontPath, string? settingsPath = null)
     {
         var settings = Load(settingsPath);
@@ -87,6 +97,7 @@ public static class AppSettingsService
     private sealed class AppSettings
     {
         public string? LastSoundFontPath { get; set; }
+        public string? LanguageCode { get; set; }
         public VocalToolSettings? Vocal { get; set; }
     }
 }

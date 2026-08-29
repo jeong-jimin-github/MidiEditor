@@ -22,7 +22,7 @@ public sealed class AudioEngine : IDisposable
     public async Task LoadSoundFontAsync(string path)
     {
         if (!File.Exists(path))
-            throw new FileNotFoundException("SoundFont 파일을 찾을 수 없습니다.", path);
+            throw new FileNotFoundException(LocalizationService.Get("Error.SoundFontFileMissing"), path);
 
         var soundFont = await Task.Run(() => new SoundFont(path));
         DisposeOutput();

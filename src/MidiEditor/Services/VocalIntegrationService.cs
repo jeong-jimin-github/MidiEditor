@@ -52,13 +52,13 @@ public static class VocalIntegrationService
 
         var discovered = DiscoverVoicebanks(settings.VoicebankRootPath);
         return discovered.FirstOrDefault()?.Path
-            ?? throw new DirectoryNotFoundException("사용 가능한 OpenUtau/UTAU 보이스뱅크를 찾을 수 없습니다.");
+            ?? throw new DirectoryNotFoundException(LocalizationService.Get("Error.VoicebankNotFound"));
     }
 
     public static string ExportUst(string path, MidiProject project, MidiTrack track, VocalToolSettings settings)
     {
         if (track.Kind != TrackKind.Vocal)
-            throw new InvalidOperationException("UST 내보내기는 Vocal 트랙에서만 사용할 수 있습니다.");
+            throw new InvalidOperationException(LocalizationService.Get("Error.UstVocalOnly"));
 
         var voicebank = ResolveVoicebankPath(track, settings);
         var notes = track.Notes.OrderBy(note => note.StartBeat).ThenBy(note => note.Pitch).ToArray();
@@ -118,7 +118,7 @@ public static class VocalIntegrationService
     public static string OpenInOpenUtau(MidiProject project, MidiTrack track, VocalToolSettings settings)
     {
         if (string.IsNullOrWhiteSpace(settings.OpenUtauPath) || !File.Exists(settings.OpenUtauPath))
-            throw new FileNotFoundException("보컬 설정에서 OpenUtau 실행 파일 경로를 먼저 지정해 주세요.", settings.OpenUtauPath);
+            throw new FileNotFoundException(LocalizationService.Get("Error.OpenUtauPathRequired"), settings.OpenUtauPath);
 
         var ustPath = ExportTemporaryUst(project, track, settings);
         Process.Start(new ProcessStartInfo
@@ -137,14 +137,14 @@ public static class VocalIntegrationService
     public static string RenderQuickPreview(MidiProject project, MidiTrack track, VocalToolSettings settings)
     {
         if (track.Kind != TrackKind.Vocal)
-            throw new InvalidOperationException("빠른 보컬 미리듣기는 Vocal 트랙에서만 사용할 수 있습니다.");
+            throw new InvalidOperationException(LocalizationService.Get("Error.PreviewVocalOnly"));
         if (track.Notes.Count == 0)
-            throw new InvalidOperationException("렌더할 보컬 노트가 없습니다.");
+            throw new InvalidOperationException(LocalizationService.Get("Error.NoVocalNotes"));
 
         var voicebank = ResolveVoicebankPath(track, settings);
         var aliases = LoadAliasMap(voicebank);
         if (aliases.Count == 0)
-            throw new InvalidDataException("보이스뱅크에서 oto.ini와 WAV 샘플을 찾지 못했습니다.");
+            throw new InvalidDataException(LocalizationService.Get("Error.VoicebankSamplesMissing"));
 
         var endSeconds = track.Notes.Max(note => BeatToSeconds(project, note.EndBeat)) + 0.15;
         var mix = new float[Math.Max(1, (int)Math.Ceiling(endSeconds * SampleRate))];

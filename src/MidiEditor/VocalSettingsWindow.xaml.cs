@@ -7,11 +7,15 @@ namespace MidiEditor;
 
 public partial class VocalSettingsWindow : Window
 {
+    private static string L(string key, params object?[] args) => LocalizationService.Get(key, args);
+
     public VocalToolSettings Settings { get; private set; }
 
     public VocalSettingsWindow(VocalToolSettings settings)
     {
         InitializeComponent();
+        LocalizationService.ApplyTo(this);
+        Loaded += (_, _) => LocalizationService.ApplyTo(this);
         Settings = settings.Clone();
         VoicebankRootBox.Text = Settings.VoicebankRootPath ?? string.Empty;
         OpenUtauBox.Text = Settings.OpenUtauPath ?? string.Empty;
@@ -23,21 +27,21 @@ public partial class VocalSettingsWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Title = "보이스뱅크 폴더의 character.txt 또는 oto.ini 선택",
-            Filter = "UTAU voicebank (character.txt;oto.ini)|character.txt;oto.ini|모든 파일 (*.*)|*.*"
+            Title = L("VoicebankBrowseTitle"),
+            Filter = $"UTAU voicebank (character.txt;oto.ini)|character.txt;oto.ini|{L("AllFiles")}"
         };
         if (dialog.ShowDialog(this) == true)
             VoicebankRootBox.Text = Path.GetDirectoryName(dialog.FileName) ?? string.Empty;
     }
 
     private void BrowseOpenUtau_Click(object sender, RoutedEventArgs e) =>
-        BrowseExecutable(OpenUtauBox, "OpenUtau 실행 파일 선택", "OpenUtau (*.exe)|*.exe|모든 파일 (*.*)|*.*");
+        BrowseExecutable(OpenUtauBox, L("OpenUtauBrowseTitle"), $"OpenUtau (*.exe)|*.exe|{L("AllFiles")}");
 
     private void BrowseResampler_Click(object sender, RoutedEventArgs e) =>
-        BrowseExecutable(ResamplerBox, "resampler 선택", "실행 파일 (*.exe)|*.exe|모든 파일 (*.*)|*.*");
+        BrowseExecutable(ResamplerBox, L("ResamplerBrowseTitle"), $"{L("ExecutableFiles")}|*.exe|{L("AllFiles")}");
 
     private void BrowseWavtool_Click(object sender, RoutedEventArgs e) =>
-        BrowseExecutable(WavtoolBox, "wavtool 선택", "실행 파일 (*.exe)|*.exe|모든 파일 (*.*)|*.*");
+        BrowseExecutable(WavtoolBox, L("WavtoolBrowseTitle"), $"{L("ExecutableFiles")}|*.exe|{L("AllFiles")}");
 
     private void BrowseExecutable(System.Windows.Controls.TextBox box, string title, string filter)
     {

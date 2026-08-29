@@ -1,3 +1,4 @@
+using System.Globalization;
 using MidiEditor.Models;
 using MidiEditor.Services;
 using Melanchall.DryWetMidi.Common;
@@ -9,6 +10,48 @@ namespace MidiEditor.Tests;
 
 public sealed class ProjectAndMidiTests
 {
+    [Fact]
+    public void Localization_DetectsSupportedCulturesAndSwitchesText()
+    {
+        var previous = LocalizationService.CurrentLanguageCode;
+        try
+        {
+            Assert.Equal("ko", LocalizationService.DetectSystemLanguageCode(new CultureInfo("ko-KR")));
+            Assert.Equal("ja", LocalizationService.DetectSystemLanguageCode(new CultureInfo("ja-JP")));
+            Assert.Equal("zh-CN", LocalizationService.DetectSystemLanguageCode(new CultureInfo("zh-TW")));
+            Assert.Equal("en", LocalizationService.DetectSystemLanguageCode(new CultureInfo("fr-FR")));
+
+            LocalizationService.SetLanguage("en-US");
+            Assert.Equal("New Project", LocalizationService.TranslateLiteral("새 프로젝트"));
+            LocalizationService.SetLanguage("ja-JP");
+            Assert.Equal("新規プロジェクト", LocalizationService.TranslateLiteral("New Project"));
+            LocalizationService.SetLanguage("zh-CN");
+            Assert.Equal("新建项目", LocalizationService.Get("Static.NewProject"));
+        }
+        finally
+        {
+            LocalizationService.SetLanguage(previous);
+        }
+    }
+
+    [Fact]
+    public void AppSettings_RemembersLanguageAndPreservesSoundFont()
+    {
+        var settingsPath = Path.Combine(Path.GetTempPath(), $"pulsegrid-settings-{Guid.NewGuid():N}.json");
+        try
+        {
+            AppSettingsService.SaveLastSoundFontPath(@"C:\Sounds\Default.sf2", settingsPath);
+            AppSettingsService.SaveLanguageCode("ja-JP", settingsPath);
+
+            Assert.Equal("ja", AppSettingsService.LoadLanguageCode(settingsPath));
+            Assert.Equal(@"C:\Sounds\Default.sf2", AppSettingsService.LoadLastSoundFontPath(settingsPath));
+        }
+        finally
+        {
+            File.Delete(settingsPath);
+        }
+    }
+
     [Fact]
     public void AppSettings_RemembersLastSoundFontPath()
     {

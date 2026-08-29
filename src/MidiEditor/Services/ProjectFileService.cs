@@ -59,7 +59,7 @@ public static class ProjectFileService
     public static MidiProject Load(string path)
     {
         var dto = JsonSerializer.Deserialize<ProjectDto>(File.ReadAllText(path), Options)
-                  ?? throw new InvalidDataException("프로젝트 파일을 읽을 수 없습니다.");
+                  ?? throw new InvalidDataException(LocalizationService.Get("Error.ProjectUnreadable"));
 
         var project = new MidiProject
         {

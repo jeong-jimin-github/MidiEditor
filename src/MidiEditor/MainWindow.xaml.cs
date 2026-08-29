@@ -14,6 +14,8 @@ namespace MidiEditor;
 
 public partial class MainWindow : Window
 {
+    private static string L(string key, params object?[] args) => LocalizationService.Get(key, args);
+
     private static readonly string[] TrackColors =
         ["#63D5A7", "#6EA8FE", "#B790F5", "#FF9D66", "#F779B8", "#64C9E8", "#E5C76B", "#9DD36D"];
 
@@ -32,11 +34,19 @@ public partial class MainWindow : Window
     private bool _syncingScrollbars;
     private bool _syncingTimeline;
     private bool _startupSoundFontLoaded;
+    private bool _languageSelectorReady;
     private MidiProject? _cleanProjectSnapshot;
 
     public MainWindow()
     {
         InitializeComponent();
+
+        var savedLanguage = AppSettingsService.LoadLanguageCode();
+        LocalizationService.SetLanguage(savedLanguage ?? LocalizationService.DetectSystemLanguageCode());
+        LanguageComboBox.ItemsSource = LocalizationService.SupportedLanguages;
+        LanguageComboBox.SelectedValue = LocalizationService.CurrentLanguageCode;
+        _languageSelectorReady = true;
+        LocalizationService.ApplyTo(this);
 
         ProgramCombo.ItemsSource = GeneralMidiPrograms.All;
         ChannelCombo.ItemsSource = Enumerable.Range(1, 16).Select(channel => $"Ch {channel}").ToArray();
@@ -91,7 +101,7 @@ public partial class MainWindow : Window
         SignatureText.Text = $"{_project.BeatsPerBar} / {_project.BeatUnit}";
         LoopToggle.IsChecked = _project.LoopEnabled;
         UpdateTitle();
-        TrackCountText.Text = $"{_project.Tracks.Count} tracks";
+        TrackCountText.Text = L("TrackCount", _project.Tracks.Count);
         Arrangement.Project = _project;
         PianoRoll.Project = _project;
         DrumPattern.Project = _project;
@@ -105,8 +115,8 @@ public partial class MainWindow : Window
         UpdatePlayhead();
         RefreshScrollBars();
         ShowStatus(soundFontMissing
-            ? $"프로젝트의 SoundFont를 찾을 수 없습니다 · {Path.GetFileName(project.SoundFontPath)}"
-            : path is null ? "새 프로젝트 · 노트를 클릭하고 드래그해 편집하세요" : $"열림 · {Path.GetFileName(path)}",
+            ? L("ProjectSoundFontMissing", Path.GetFileName(project.SoundFontPath))
+            : path is null ? L("NewProjectReady") : L("Opened", Path.GetFileName(path)),
             warning: soundFontMissing);
     }
 
@@ -136,7 +146,7 @@ public partial class MainWindow : Window
             VocalInspectorPanel.Visibility = Visibility.Collapsed;
             LyricBox.Text = string.Empty;
             LyricBox.IsEnabled = false;
-            EditorTrackTitle.Text = "No track selected";
+            EditorTrackTitle.Text = L("NoTrackSelected");
             EditorColorBar.Background = Brushes.Transparent;
             SelectionStatusText.Text = string.Empty;
         }
@@ -150,7 +160,7 @@ public partial class MainWindow : Window
             VocalInspectorPanel.Visibility = _selectedTrack.Kind == TrackKind.Vocal ? Visibility.Visible : Visibility.Collapsed;
             EditorTrackTitle.Text = _selectedTrack.Name;
             EditorColorBar.Background = new SolidColorBrush(DrawingColor(_selectedTrack.Color));
-            SelectionStatusText.Text = $"{_selectedTrack.Notes.Count} notes  ·  {_selectedTrack.ProgramLabel}";
+            SelectionStatusText.Text = L("NotesCount", _selectedTrack.Notes.Count, _selectedTrack.ProgramLabel);
         }
         _updatingUi = false;
         RefreshVocalInspector();
@@ -168,14 +178,14 @@ public partial class MainWindow : Window
         Arrangement.TimelineInset = drums ? DrumPattern.TimelineInset : PianoRoll.TimelineInset;
         PianoRoll.Visibility = drums ? Visibility.Collapsed : Visibility.Visible;
         DrumPattern.Visibility = drums ? Visibility.Visible : Visibility.Collapsed;
-        PianoTabButton.Content = _selectedTrack?.Kind == TrackKind.Vocal ? "VOCAL ROLL" : "PIANO ROLL";
+        PianoTabButton.Content = _selectedTrack?.Kind == TrackKind.Vocal ? L("Static.VocalRoll") : L("Static.PianoRoll");
         PianoTabButton.Background = drums ? new SolidColorBrush(Color.FromRgb(36, 42, 52)) : FindBrush("AccentDarkBrush");
         DrumTabButton.Background = drums ? FindBrush("AccentDarkBrush") : new SolidColorBrush(Color.FromRgb(36, 42, 52));
         EditorHintText.Text = drums
-            ? "  ·  click paint  ·  right-drag erase  ·  wheel instruments"
+            ? L("EditorHint.Drums")
             : _selectedTrack?.Kind == TrackKind.Vocal
-                ? "  ·  draw notes  ·  select note then edit LYRIC  ·  quick render preview"
-                : "  ·  left draw/move  ·  edge resize  ·  right-drag erase";
+                ? L("EditorHint.Vocal")
+                : L("EditorHint.Piano");
         SyncTimelineHorizontalOffset(drums ? DrumPattern.HorizontalOffset : PianoRoll.HorizontalOffset);
         RefreshScrollBars();
     }
@@ -240,13 +250,13 @@ public partial class MainWindow : Window
             _currentBeat = _audio.CurrentBeat;
             _audio.Stop();
             PlayButton.Content = "▶";
-            ShowStatus("일시정지");
+            ShowStatus(L("Paused"));
             return;
         }
 
         if (!_audio.IsLoaded && !await LoadDefaultOrChooseSoundFontAsync())
         {
-            ShowStatus("재생하려면 SoundFont(.sf2)를 먼저 선택해 주세요", warning: true);
+            ShowStatus(L("NeedSoundFont"), warning: true);
             return;
         }
 
@@ -254,7 +264,7 @@ public partial class MainWindow : Window
             _currentBeat = _project.LoopEnabled ? _project.LoopStartBeat : 0;
         _audio.Start(_project, _currentBeat);
         PlayButton.Content = "❚❚";
-        ShowStatus("재생 중 · Space로 일시정지");
+        ShowStatus(L("Playing"));
     }
 
     private void StopButton_Click(object sender, RoutedEventArgs e)
@@ -262,7 +272,7 @@ public partial class MainWindow : Window
         _audio.Stop();
         _currentBeat = 0;
         UpdatePlayhead();
-        ShowStatus("정지");
+        ShowStatus(L("Stopped"));
     }
 
     private void RewindButton_Click(object sender, RoutedEventArgs e)
@@ -277,8 +287,8 @@ public partial class MainWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Title = "SoundFont 선택",
-            Filter = "SoundFont 2 (*.sf2)|*.sf2|모든 파일 (*.*)|*.*",
+            Title = L("SoundFontSelect"),
+            Filter = $"SoundFont 2 (*.sf2)|*.sf2|{L("AllFiles")}",
             CheckFileExists = true
         };
         if (dialog.ShowDialog(this) != true)
@@ -300,9 +310,9 @@ public partial class MainWindow : Window
         try
         {
             SoundFontButton.IsEnabled = false;
-            SoundFontButton.Content = "SF2 로딩 중…";
+            SoundFontButton.Content = L("Sf2LoadingButton");
             SoundFontDot.Fill = FindBrush("WarningBrush");
-            ShowStatus($"SoundFont 로딩 중 · {Path.GetFileName(path)}");
+            ShowStatus(L("SoundFontLoading", Path.GetFileName(path)));
             await _audio.LoadSoundFontAsync(path);
             _project.SoundFontPath = path;
             AppSettingsService.SaveLastSoundFontPath(path);
@@ -315,7 +325,7 @@ public partial class MainWindow : Window
             SoundFontDot.Fill = FindBrush("AccentBrush");
             CpuStatusText.Text = "SF2 READY";
             CpuStatusText.Foreground = FindBrush("AccentBrush");
-            ShowStatus($"SoundFont 준비 완료 · {_audio.SoundFontName}");
+            ShowStatus(L("SoundFontReady", _audio.SoundFontName));
             return true;
         }
         catch (Exception exception)
@@ -325,14 +335,14 @@ public partial class MainWindow : Window
                 SoundFontButton.Content = $"●  {_audio.SoundFontName}";
                 SoundFontDot.Fill = FindBrush("AccentBrush");
                 CpuStatusText.Text = "SF2 READY";
-                ShowError("새 SoundFont를 읽지 못해 기존 SoundFont를 유지합니다.", exception);
+                ShowError(L("SoundFontKeepOldError"), exception);
             }
             else
             {
-                SoundFontButton.Content = "SF2 불러오기";
+                SoundFontButton.Content = L("Static.LoadSf2");
                 SoundFontDot.Fill = FindBrush("DangerBrush");
                 CpuStatusText.Text = "SF2 ERROR";
-                ShowError("SoundFont를 불러오지 못했습니다.", exception);
+                ShowError(L("SoundFontLoadError"), exception);
             }
             return false;
         }
@@ -346,6 +356,7 @@ public partial class MainWindow : Window
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
+        LocalizationService.ApplyTo(this);
         if (_startupSoundFontLoaded)
             return;
         _startupSoundFontLoaded = true;
@@ -362,7 +373,7 @@ public partial class MainWindow : Window
             _cleanProjectSnapshot = _project.Clone();
             SetDirty(false);
             if (string.Equals(startupPath, BundledAssetsService.DefaultSoundFontPath, StringComparison.OrdinalIgnoreCase))
-                ShowStatus("기본 CC0 SoundFont 준비 완료 · ChaosBank");
+                ShowStatus(L("BundledSoundFontReady"));
         }
     }
 
@@ -379,7 +390,7 @@ public partial class MainWindow : Window
         SetDirty();
         Arrangement.InvalidateVisual();
         RefreshSelectedTrack(autoChooseEditor: false);
-        ShowStatus("편집 완료 · Ctrl+Z로 실행 취소");
+        ShowStatus(L("EditComplete"));
 
         if (_audio.IsPlaying)
             _audio.Start(_project, _audio.CurrentBeat);
@@ -435,7 +446,7 @@ public partial class MainWindow : Window
             .FirstOrDefault();
         if (kind != TrackKind.Drums && availableChannel is null)
         {
-            ShowStatus("사용 가능한 MIDI 채널이 없습니다 (Ch 10 제외 최대 15개)", warning: true);
+            ShowStatus(L("NoMidiChannels"), warning: true);
             return;
         }
 
@@ -459,10 +470,10 @@ public partial class MainWindow : Window
         _project.Tracks.Add(track);
         _history.Commit(_project);
         SetDirty();
-        TrackCountText.Text = $"{_project.Tracks.Count} tracks";
+        TrackCountText.Text = L("TrackCount", _project.Tracks.Count);
         TrackListBox.SelectedItem = track;
         Arrangement.InvalidateVisual();
-        ShowStatus($"{track.Name} 트랙을 추가했습니다");
+        ShowStatus(L("TrackAdded", track.Name));
     }
 
     private void DeleteTrackButton_Click(object sender, RoutedEventArgs e)
@@ -474,11 +485,11 @@ public partial class MainWindow : Window
         _project.Tracks.Remove(_selectedTrack);
         _history.Commit(_project);
         SetDirty();
-        TrackCountText.Text = $"{_project.Tracks.Count} tracks";
+        TrackCountText.Text = L("TrackCount", _project.Tracks.Count);
         TrackListBox.SelectedIndex = _project.Tracks.Count == 0 ? -1 : Math.Min(index, _project.Tracks.Count - 1);
         RefreshSelectedTrack(autoChooseEditor: true);
         Arrangement.InvalidateVisual();
-        ShowStatus("트랙을 삭제했습니다");
+        ShowStatus(L("TrackDeleted"));
     }
 
     private void TrackNameBox_Commit(object sender, KeyboardFocusChangedEventArgs e) => CommitTrackName();
@@ -504,7 +515,7 @@ public partial class MainWindow : Window
         _history.Commit(_project);
         SetDirty();
         TrackListBox.Items.Refresh();
-        SelectionStatusText.Text = $"{_selectedTrack.Notes.Count} notes  ·  {_selectedTrack.ProgramLabel}";
+        SelectionStatusText.Text = L("NotesCount", _selectedTrack.Notes.Count, _selectedTrack.ProgramLabel);
         if (_audio.IsPlaying)
             _audio.Start(_project, _audio.CurrentBeat);
     }
@@ -519,7 +530,7 @@ public partial class MainWindow : Window
             _updatingUi = true;
             ChannelCombo.SelectedIndex = _selectedTrack.Channel;
             _updatingUi = false;
-            ShowStatus("Ch 10은 GM 드럼 전용 채널입니다", warning: true);
+            ShowStatus(L("DrumChannelOnly"), warning: true);
             return;
         }
         if (_project.Tracks.Any(track => track != _selectedTrack && track.Kind == TrackKind.Instrument && track.Channel == requestedChannel))
@@ -527,7 +538,7 @@ public partial class MainWindow : Window
             _updatingUi = true;
             ChannelCombo.SelectedIndex = _selectedTrack.Channel;
             _updatingUi = false;
-            ShowStatus($"Ch {requestedChannel + 1}은 다른 악기 트랙에서 사용 중입니다", warning: true);
+            ShowStatus(L("ChannelInUse", requestedChannel + 1), warning: true);
             return;
         }
         _history.Begin(_project);
@@ -591,8 +602,8 @@ public partial class MainWindow : Window
         if (_history.Commit(_project))
             SetDirty();
         TrackListBox.Items.Refresh();
-        SelectionStatusText.Text = $"{_selectedTrack.Notes.Count} notes  ·  {_selectedTrack.ProgramLabel}";
-        ShowStatus($"보이스뱅크 변경 · {voicebank.Name}");
+        SelectionStatusText.Text = L("NotesCount", _selectedTrack.Notes.Count, _selectedTrack.ProgramLabel);
+        ShowStatus(L("VoicebankChanged", voicebank.Name));
     }
 
     private void LyricBox_Commit(object sender, KeyboardFocusChangedEventArgs e) => CommitLyric();
@@ -623,7 +634,7 @@ public partial class MainWindow : Window
         if (_history.Commit(_project))
             SetDirty();
         PianoRoll.InvalidateVisual();
-        ShowStatus(selected.Length == 1 ? $"가사 변경 · {lyric}" : $"선택 노트 {selected.Length}개의 가사를 변경했습니다");
+        ShowStatus(selected.Length == 1 ? L("LyricChangedOne", lyric) : L("LyricChangedMany", selected.Length));
     }
 
     private void VocalSettingsButton_Click(object sender, RoutedEventArgs e) => EditVocalSettings();
@@ -636,7 +647,7 @@ public partial class MainWindow : Window
         _vocalSettings = dialog.Settings;
         AppSettingsService.SaveVocalSettings(_vocalSettings);
         RefreshVocalInspector();
-        ShowStatus("보컬/OpenUtau 설정을 저장했습니다");
+        ShowStatus(L("VocalSettingsSaved"));
         return true;
     }
 
@@ -653,14 +664,14 @@ public partial class MainWindow : Window
         {
             _audio.Stop();
             _vocalPreview.Stop();
-            ShowStatus("보컬 빠른 미리듣기 렌더 중…");
+            ShowStatus(L("VocalRendering"));
             var path = await VocalIntegrationService.RenderQuickPreviewAsync(project, track, _vocalSettings.Clone());
             _vocalPreview.Play(path);
-            ShowStatus($"보컬 미리듣기 재생 · {track.ProgramLabel}");
+            ShowStatus(L("VocalPreviewPlaying", track.ProgramLabel));
         }
         catch (Exception exception)
         {
-            ShowError("보컬 미리듣기를 만들지 못했습니다.", exception);
+            ShowError(L("VocalPreviewError"), exception);
         }
         finally
         {
@@ -682,11 +693,11 @@ public partial class MainWindow : Window
         try
         {
             var path = VocalIntegrationService.OpenInOpenUtau(_project, _selectedTrack, _vocalSettings);
-            ShowStatus($"OpenUtau로 열었습니다 · {Path.GetFileName(path)}");
+            ShowStatus(L("OpenUtauOpened", Path.GetFileName(path)));
         }
         catch (Exception exception)
         {
-            ShowError("OpenUtau를 실행하지 못했습니다.", exception);
+            ShowError(L("OpenUtauError"), exception);
         }
     }
 
@@ -895,7 +906,7 @@ public partial class MainWindow : Window
         previous.SoundFontPath = _project.SoundFontPath;
         ApplyProject(previous, _projectPath, false, selectedTrackId);
         SetDirty();
-        ShowStatus("실행 취소");
+        ShowStatus(L("Undo"));
     }
 
     private void Redo()
@@ -907,7 +918,7 @@ public partial class MainWindow : Window
         next.SoundFontPath = _project.SoundFontPath;
         ApplyProject(next, _projectPath, false, selectedTrackId);
         SetDirty();
-        ShowStatus("다시 실행");
+        ShowStatus(L("Redo"));
     }
 
     private void NewButton_Click(object sender, RoutedEventArgs e)
@@ -928,8 +939,8 @@ public partial class MainWindow : Window
             return;
         var dialog = new OpenFileDialog
         {
-            Title = "PulseGrid 프로젝트 열기",
-            Filter = "PulseGrid Project (*.pulsegrid)|*.pulsegrid|JSON (*.json)|*.json|모든 파일 (*.*)|*.*"
+            Title = L("ProjectOpenTitle"),
+            Filter = $"PulseGrid Project (*.pulsegrid)|*.pulsegrid|JSON (*.json)|*.json|{L("AllFiles")}"
         };
         if (dialog.ShowDialog(this) != true)
             return;
@@ -947,7 +958,7 @@ public partial class MainWindow : Window
         }
         catch (Exception exception)
         {
-            ShowError("프로젝트를 열지 못했습니다.", exception);
+            ShowError(L("ProjectOpenError"), exception);
         }
     }
 
@@ -960,7 +971,7 @@ public partial class MainWindow : Window
         {
             var dialog = new SaveFileDialog
             {
-                Title = "PulseGrid 프로젝트 저장",
+                Title = L("ProjectSaveTitle"),
                 Filter = "PulseGrid Project (*.pulsegrid)|*.pulsegrid",
                 FileName = SanitizeFileName(_project.Name) + ".pulsegrid",
                 AddExtension = true,
@@ -977,12 +988,12 @@ public partial class MainWindow : Window
             _projectPath = path;
             _cleanProjectSnapshot = _project.Clone();
             SetDirty(false);
-            ShowStatus($"저장됨 · {Path.GetFileName(path)}");
+            ShowStatus(L("Saved", Path.GetFileName(path)));
             return true;
         }
         catch (Exception exception)
         {
-            ShowError("프로젝트를 저장하지 못했습니다.", exception);
+            ShowError(L("ProjectSaveError"), exception);
             return false;
         }
     }
@@ -993,25 +1004,25 @@ public partial class MainWindow : Window
             return;
         var dialog = new OpenFileDialog
         {
-            Title = "MIDI 가져오기",
-            Filter = "MIDI 파일 (*.mid;*.midi)|*.mid;*.midi|모든 파일 (*.*)|*.*"
+            Title = L("MidiImportTitle"),
+            Filter = $"{L("MidiFiles")} (*.mid;*.midi)|*.mid;*.midi|{L("AllFiles")}"
         };
         if (dialog.ShowDialog(this) != true)
             return;
         try
         {
-            ShowStatus($"MIDI 분석 중 · {Path.GetFileName(dialog.FileName)}");
+            ShowStatus(L("MidiAnalyzing", Path.GetFileName(dialog.FileName)));
             var imported = await Task.Run(() => MidiFileService.Import(dialog.FileName));
             if (_audio.IsLoaded)
                 imported.SoundFontPath = _project.SoundFontPath;
             ApplyProject(imported, null, true);
             _cleanProjectSnapshot = null;
             SetDirty(force: true);
-            ShowStatus($"MIDI 가져오기 완료 · {imported.Tracks.Count} tracks");
+            ShowStatus(L("MidiImportComplete", imported.Tracks.Count));
         }
         catch (Exception exception)
         {
-            ShowError("MIDI 파일을 가져오지 못했습니다.", exception);
+            ShowError(L("MidiImportError"), exception);
         }
     }
 
@@ -1019,8 +1030,8 @@ public partial class MainWindow : Window
     {
         var dialog = new SaveFileDialog
         {
-            Title = "MIDI 내보내기",
-            Filter = "MIDI 파일 (*.mid)|*.mid",
+            Title = L("MidiExportTitle"),
+            Filter = $"{L("MidiFiles")} (*.mid)|*.mid",
             FileName = SanitizeFileName(_project.Name) + ".mid",
             AddExtension = true,
             DefaultExt = ".mid"
@@ -1029,13 +1040,13 @@ public partial class MainWindow : Window
             return;
         try
         {
-            ShowStatus("MIDI 내보내는 중…");
+            ShowStatus(L("MidiExporting"));
             await Task.Run(() => MidiFileService.Export(dialog.FileName, _project.Clone()));
-            ShowStatus($"MIDI 내보내기 완료 · {Path.GetFileName(dialog.FileName)}");
+            ShowStatus(L("MidiExportComplete", Path.GetFileName(dialog.FileName)));
         }
         catch (Exception exception)
         {
-            ShowError("MIDI 파일을 내보내지 못했습니다.", exception);
+            ShowError(L("MidiExportError"), exception);
         }
     }
 
@@ -1082,6 +1093,33 @@ public partial class MainWindow : Window
         }
     }
 
+    private void LanguageComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_languageSelectorReady || LanguageComboBox.SelectedValue is not string code)
+            return;
+
+        LocalizationService.SetLanguage(code);
+        AppSettingsService.SaveLanguageCode(code);
+        LocalizationService.ApplyTo(this);
+        RefreshLocalizedUi();
+        ShowStatus(L("LanguageChanged"));
+    }
+
+    private void RefreshLocalizedUi()
+    {
+        if (_project is null)
+            return;
+
+        TrackCountText.Text = L("TrackCount", _project.Tracks.Count);
+        if (_selectedTrack is null)
+            EditorTrackTitle.Text = L("NoTrackSelected");
+        else
+            SelectionStatusText.Text = L("NotesCount", _selectedTrack.Notes.Count, _selectedTrack.ProgramLabel);
+        SelectEditor(_showingDrums);
+        if (!_audio.IsLoaded)
+            SetSoundFontOffline();
+    }
+
     private void ShowStatus(string message, bool warning = false)
     {
         StatusText.Text = message;
@@ -1090,9 +1128,9 @@ public partial class MainWindow : Window
 
     private void SetSoundFontOffline()
     {
-        SoundFontButton.Content = "SF2 불러오기";
+        SoundFontButton.Content = L("Static.LoadSf2");
         SoundFontDot.Fill = FindBrush("DangerBrush");
-        CpuStatusText.Text = "SF2 OFFLINE";
+        CpuStatusText.Text = L("Static.Sf2Offline");
         CpuStatusText.Foreground = new SolidColorBrush(Color.FromRgb(104, 116, 135));
     }
 
@@ -1120,7 +1158,7 @@ public partial class MainWindow : Window
             return true;
 
         var result = MessageBox.Show(this,
-            "현재 프로젝트의 변경 내용을 저장할까요?",
+            L("ConfirmSaveChanges"),
             "PulseGrid",
             MessageBoxButton.YesNoCancel,
             MessageBoxImage.Question);
